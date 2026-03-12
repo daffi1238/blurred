@@ -1,0 +1,52 @@
+services:
+  blur-app:
+    build:
+      context: ./blur
+      dockerfile: Dockerfile
+    container_name: blur-app
+    environment:
+      # Apunta al llama-server del proyecto DocxQA (red externa)
+      - LLM_BASE_URL=http://llama-server:8080/v1
+      - LLM_API_KEY=llm-local-key-changeme-abc123
+      - LLM_MODEL=qwen-coder
+      - LLM_TIMEOUT=120
+    volumes:
+      - ./blur/app.py:/app/app.py           # hot-reload backend
+      - ./blur/index.html:/app/index.html   # hot-reload frontend
+      - ./data:/app/data                    # diccionario global persistente
+    ports:
+      - "8100:8000"   # acceso directo: http://localhost:8100
+    networks:
+      - llm-net
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:alpine
+    container_name: blur-caddy
+    ports:
+      - "8443:443"
+      - "8180:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-blur-data:/data
+      - caddy-blur-config:/config
+    networks:
+      - llm-net
+    depends_on:
+      - blur-app
+    restart: unless-stopped
+
+# ── Red compartida con DocxQA ──────────────────────────────────────────────────
+# La red "docxqa_llm-net" la crea el docker-compose.yaml de ../DocxQA/.
+# Asegúrate de que DocxQA esté levantado antes de arrancar este proyecto:
+#   cd ../DocxQA && docker compose up -d
+# Si prefieres red standalone, comenta "external" y descomenta "driver: bridge".
+
+networks:
+  llm-net:
+    external: true
+    name: docxqa_llm-net
+
+volumes:
+  caddy-blur-data:
+  caddy-blur-config:

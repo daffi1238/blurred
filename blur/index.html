@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blurred – Anonimizador de Texto</title>
+<style>
+:root {
+  --bg:        #0c0e1a;
+  --surface:   #141728;
+  --surface2:  #1c2038;
+  --border:    #2a2f52;
+  --accent:    #818cf8;
+  --accent2:   #6366f1;
+  --text:      #e2e8f0;
+  --muted:     #8892b0;
+  --success:   #34d399;
+  --warn:      #fbbf24;
+  --error:     #f87171;
+  --radius:    8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+header .logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+header .logo span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+.health-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-left: auto;
+  transition: background 0.3s;
+}
+.health-dot.ok  { background: var(--success); }
+.health-dot.err { background: var(--error); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 12px 24px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px 10px;
+  transition: color .2s, border-color .2s;
+}
+.tab-btn:hover  { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Main layout ── */
+main {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Session bar ── */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.session-bar label { color: var(--muted); }
+.session-bar code {
+  color: var(--accent);
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 11px;
+  background: #0008;
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-bar .copy-sid {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  transition: color .2s, border-color .2s;
+}
+.session-bar .copy-sid:hover { color: var(--accent); border-color: var(--accent); }
+.session-bar .instructions {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ── Two-column ── */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  min-height: 420px;
+}
+
+.col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.col-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* ── Textarea ── */
+textarea {
+  background: #0008;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  flex: 1;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+  padding: 12px;
+  resize: none;
+  transition: border-color .2s;
+  min-height: 320px;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--muted); }
+
+/* ── Output box ── */
+.output-box {
+  background: #0008;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  flex: 1;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 320px;
+  overflow-y: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.output-box.empty { color: var(--muted); font-style: italic; }
+.output-box .highlight {
+  background: rgba(129,140,248,.18);
+  border-radius: 3px;
+  color: var(--accent);
+  padding: 0 2px;
+}
+
+/* Loading state */
+.output-box.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-style: italic;
+  font-family: system-ui;
+}
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Buttons ── */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+button {
+  background: var(--accent2);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  transition: background .2s, opacity .2s, transform .1s;
+}
+button:hover:not(:disabled) { background: var(--accent); transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(0); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+button.secondary:hover:not(:disabled) { color: var(--text); border-color: var(--text); background: transparent; }
+
+button.danger {
+  background: transparent;
+  border: 1px solid #f8717140;
+  color: var(--error);
+}
+button.danger:hover:not(:disabled) { background: #f8717115; }
+
+/* ── Mapping table ── */
+.mapping-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.mapping-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 14px;
+  text-align: left;
+  transform: none;
+}
+.mapping-toggle:hover { color: var(--text); background: var(--surface2); }
+.mapping-toggle .arrow { transition: transform .2s; }
+.mapping-toggle.open .arrow { transform: rotate(90deg); }
+
+.mapping-body {
+  display: none;
+  padding: 0 14px 14px;
+  overflow-x: auto;
+}
+.mapping-body.open { display: block; }
+
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 600;
+  padding: 6px 12px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+td {
+  border-bottom: 1px solid #ffffff08;
+  font-family: 'Consolas', monospace;
+  padding: 5px 12px;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+.td-original { color: var(--error); }
+.td-fake     { color: var(--success); }
+
+/* ── Manual entry form ── */
+.manual-entry-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+  border-radius: 0 0 var(--radius) var(--radius);
+  flex-wrap: wrap;
+}
+.manual-entry-form input {
+  background: #0008;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  outline: none;
+  padding: 6px 10px;
+  transition: border-color .2s;
+}
+.manual-entry-form input:focus { border-color: var(--accent); }
+.manual-entry-form input::placeholder { color: var(--muted); }
+.manual-entry-form .inp-original { flex: 2; min-width: 140px; }
+.manual-entry-form .inp-fake     { flex: 2; min-width: 140px; }
+.manual-entry-form label { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.tag-manual {
+  background: rgba(251,191,36,.15);
+  border: 1px solid rgba(251,191,36,.35);
+  border-radius: 3px;
+  color: var(--warn);
+  font-size: 10px;
+  font-family: system-ui;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── Session ID input (deblur tab) ── */
+.session-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.session-input-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.session-input-row input {
+  background: #0008;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  flex: 1;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  outline: none;
+  padding: 7px 12px;
+  transition: border-color .2s;
+}
+.session-input-row input:focus { border-color: var(--accent); }
+.session-input-row input::placeholder { color: var(--muted); }
+
+/* ── Toast ── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 10px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity .25s, transform .25s;
+  z-index: 999;
+  max-width: 320px;
+}
+#toast.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+#toast.ok   { border-color: var(--success); color: var(--success); }
+#toast.err  { border-color: var(--error);   color: var(--error); }
+
+/* ── Panel visibility ── */
+.panel { display: none; flex-direction: column; gap: 16px; }
+.panel.active { display: flex; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .columns { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">🔒 Blurred <span>Anonimizador de texto con LLM local</span></div>
+  <div class="health-dot" id="healthDot" title="Estado del servicio"></div>
+</header>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('anonymise')" id="tab-anonymise">Anonimizar</button>
+  <button class="tab-btn"        onclick="switchTab('deblur')"    id="tab-deblur">Desanonimizar</button>
+</div>
+
+<main>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: ANONIMIZAR
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel active" id="panel-anonymise">
+
+    <!-- Session bar (hidden until first run) -->
+    <div class="session-bar" id="sessionBar" style="display:none">
+      <label>Sesión:</label>
+      <code id="sessionIdDisplay">—</code>
+      <button class="copy-sid" onclick="copySid()">Copiar ID</button>
+      <span class="instructions">Guarda este ID para poder desanonimizar las respuestas del LLM</span>
+    </div>
+
+    <!-- Two columns -->
+    <div class="columns">
+
+      <!-- Left: original text -->
+      <div class="col">
+        <div class="col-header">
+          <span class="col-title">Texto Original</span>
+          <button class="secondary" onclick="clearInput()" style="font-size:11px;padding:4px 10px">Limpiar</button>
+        </div>
+        <textarea
+          id="inputText"
+          placeholder="Pega aquí el texto con información sensible (nombres, DNIs, IPs, emails, teléfonos, dominios…)"></textarea>
+        <div class="btn-row">
+          <button id="btnAnonymise" onclick="doAnonymise()">🔒 Anonimizar</button>
+          <span id="statusMsg" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+      </div>
+
+      <!-- Right: anonymised output -->
+      <div class="col">
+        <div class="col-header">
+          <span class="col-title">Texto Anonimizado</span>
+          <button class="secondary" onclick="copyOutput()" id="btnCopyOut" style="font-size:11px;padding:4px 10px" disabled>Copiar</button>
+        </div>
+        <div class="output-box empty" id="outputBox">El texto anonimizado aparecerá aquí…</div>
+        <div class="btn-row">
+          <button class="secondary" onclick="copyToDeblur()" id="btnToDeblur" disabled style="font-size:12px">Usar en Desanonimizar →</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Mapping table -->
+    <div class="mapping-section" id="mappingSection" style="display:none">
+      <button class="mapping-toggle" id="mappingToggle" onclick="toggleMapping()">
+        <span>▶ <span class="arrow"></span> Mapa de sustituciones</span>
+        <span id="mappingCount" style="color:var(--accent);font-size:11px"></span>
+      </button>
+      <div class="mapping-body" id="mappingBody">
+        <table>
+          <thead><tr><th>Original</th><th>Anonimizado</th></tr></thead>
+          <tbody id="mappingTableBody"></tbody>
+        </table>
+        <!-- Manual entry form -->
+        <div class="manual-entry-form">
+          <label>Añadir manual:</label>
+          <input class="inp-original" id="manualOriginal" type="text" placeholder="Valor original sensible…" />
+          <input class="inp-fake"     id="manualFake"     type="text" placeholder="Sustitución (vacío = auto)" />
+          <button style="font-size:12px;padding:6px 14px" onclick="addManualEntry()">+ Añadir</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-anonymise -->
+
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: DESANONIMIZAR
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel" id="panel-deblur">
+
+    <!-- Session ID input -->
+    <div class="session-input-row">
+      <label>Session ID:</label>
+      <input type="text" id="deblurSessionId" placeholder="Pega aquí el Session ID obtenido al anonimizar…">
+      <button class="secondary" style="font-size:12px;padding:7px 12px" onclick="pasteSessionId()">📋 Pegar</button>
+    </div>
+
+    <!-- Two columns -->
+    <div class="columns">
+
+      <!-- Left: anonymised response -->
+      <div class="col">
+        <div class="col-header">
+          <span class="col-title">Respuesta con datos anonimizados</span>
+          <button class="secondary" onclick="clearDeblurInput()" style="font-size:11px;padding:4px 10px">Limpiar</button>
+        </div>
+        <textarea
+          id="deblurInput"
+          placeholder="Pega aquí la respuesta del LLM en la nube que contiene datos anonimizados (nombres falsos, IPs falsas, etc.)…"></textarea>
+        <div class="btn-row">
+          <button id="btnDeblur" onclick="doDeblur()">🔓 Restaurar datos originales</button>
+          <span id="deblurStatus" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+      </div>
+
+      <!-- Right: restored text -->
+      <div class="col">
+        <div class="col-header">
+          <span class="col-title">Texto con datos reales</span>
+          <button class="secondary" onclick="copyDeblurOutput()" id="btnCopyDeblur" style="font-size:11px;padding:4px 10px" disabled>Copiar</button>
+        </div>
+        <div class="output-box empty" id="deblurOutput">El texto restaurado aparecerá aquí…</div>
+      </div>
+
+    </div>
+
+  </div><!-- /panel-deblur -->
+
+</main>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let currentSessionId = null;
+let anonymisedText   = null;
+let busy             = false;
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch('/health');
+    document.getElementById('healthDot').className = r.ok ? 'health-dot ok' : 'health-dot err';
+  } catch {
+    document.getElementById('healthDot').className = 'health-dot err';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30_000);
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-'  + name).classList.add('active');
+  document.getElementById('tab-'    + name).classList.add('active');
+}
+
+// ── Anonymise ─────────────────────────────────────────────────────────────────
+async function doAnonymise() {
+  if (busy) return;
+  const text = document.getElementById('inputText').value.trim();
+  if (!text) { toast('Pega algún texto primero', 'err'); return; }
+
+  busy = true;
+  const btn = document.getElementById('btnAnonymise');
+  btn.disabled = true;
+  setStatus('statusMsg', '');
+
+  const box = document.getElementById('outputBox');
+  box.className = 'output-box loading';
+  box.innerHTML = '<div class="spinner"></div> Anonimizando con LLM local…';
+
+  document.getElementById('btnCopyOut').disabled  = true;
+  document.getElementById('btnToDeblur').disabled = true;
+
+  try {
+    const res = await fetch('/anonymise', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, session_id: currentSessionId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+
+    const data = await res.json();
+    if (!data.anonymised_text && data.anonymised_text !== '') {
+      throw new Error('Respuesta inesperada del servidor: ' + JSON.stringify(data).slice(0, 120));
+    }
+    currentSessionId  = data.session_id;
+    anonymisedText    = String(data.anonymised_text);
+    const mapping     = data.mapping || {};
+    const count       = Object.keys(mapping).length;
+
+    // Show session bar
+    const bar = document.getElementById('sessionBar');
+    bar.style.display = 'flex';
+    document.getElementById('sessionIdDisplay').textContent = currentSessionId;
+
+    // Auto-fill deblur session ID
+    document.getElementById('deblurSessionId').value = currentSessionId;
+
+    // Render output with highlights
+    box.className = 'output-box';
+    box.innerHTML = buildHighlightedOutput(anonymisedText, mapping);
+
+    // Enable buttons
+    document.getElementById('btnCopyOut').disabled  = false;
+    document.getElementById('btnToDeblur').disabled = false;
+
+    // Mapping table
+    renderMapping(mapping);
+    setStatus('statusMsg', `✓ ${count} sustituciones`, 'var(--success)');
+    toast(`Anonimizado: ${count} valores reemplazados`, 'ok');
+
+  } catch (e) {
+    box.className = 'output-box empty';
+    box.textContent = 'Error al anonimizar.';
+    setStatus('statusMsg', '✗ ' + e.message, 'var(--error)');
+    toast('Error: ' + e.message, 'err');
+  }
+
+  busy = false;
+  btn.disabled = false;
+}
+
+// Build output HTML with fake values highlighted
+function buildHighlightedOutput(text, mapping) {
+  const safe = String(text ?? '');
+  const fakeValues = Object.values(mapping).map(v => String(v ?? '')).filter(Boolean);
+  if (!fakeValues.length) return esc(safe);
+
+  // Sort longest first to avoid partial-match issues
+  const sorted = [...fakeValues].sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(sorted.map(escapeRegex).join('|'), 'g');
+
+  return safe.replace(pattern, m => `<span class="highlight">${esc(m)}</span>`);
+}
+
+function escapeRegex(s) {
+  return String(s ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Deblur ────────────────────────────────────────────────────────────────────
+async function doDeblur() {
+  if (busy) return;
+  const sid  = document.getElementById('deblurSessionId').value.trim();
+  const text = document.getElementById('deblurInput').value.trim();
+  if (!sid)  { toast('Introduce un Session ID', 'err'); return; }
+  if (!text) { toast('Pega el texto a restaurar', 'err'); return; }
+
+  busy = true;
+  const btn = document.getElementById('btnDeblur');
+  btn.disabled = true;
+
+  const box = document.getElementById('deblurOutput');
+  box.className = 'output-box loading';
+  box.innerHTML = '<div class="spinner"></div> Restaurando datos originales…';
+
+  try {
+    const res = await fetch('/deblur', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, session_id: sid }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+
+    const data = await res.json();
+    box.className  = 'output-box';
+    box.textContent = data.original_text;
+    document.getElementById('btnCopyDeblur').disabled = false;
+    setStatus('deblurStatus', '✓ Restaurado', 'var(--success)');
+    toast('Datos originales restaurados', 'ok');
+
+  } catch (e) {
+    box.className   = 'output-box empty';
+    box.textContent = 'Error al restaurar.';
+    setStatus('deblurStatus', '✗ ' + e.message, 'var(--error)');
+    toast('Error: ' + e.message, 'err');
+  }
+
+  busy = false;
+  btn.disabled = false;
+}
+
+// ── Mapping table ─────────────────────────────────────────────────────────────
+function renderMapping(mapping) {
+  const tbody = document.getElementById('mappingTableBody');
+  tbody.innerHTML = '';
+  const entries = Object.entries(mapping);
+
+  if (!entries.length) {
+    document.getElementById('mappingSection').style.display = 'none';
+    return;
+  }
+
+  entries.forEach(([orig, fake]) => appendMappingRow(orig, fake));
+
+  document.getElementById('mappingCount').textContent = `${entries.length} entradas`;
+  document.getElementById('mappingSection').style.display = '';
+}
+
+function toggleMapping() {
+  const toggle = document.getElementById('mappingToggle');
+  const body   = document.getElementById('mappingBody');
+  toggle.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function copyOutput() {
+  if (!anonymisedText) return;
+  navigator.clipboard.writeText(anonymisedText).then(() => toast('Texto anonimizado copiado', 'ok'));
+}
+
+function copyToDeblur() {
+  if (!anonymisedText) return;
+  switchTab('deblur');
+  document.getElementById('deblurInput').value = anonymisedText;
+}
+
+function copyDeblurOutput() {
+  const txt = document.getElementById('deblurOutput').textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('Texto restaurado copiado', 'ok'));
+}
+
+function copySid() {
+  if (!currentSessionId) return;
+  navigator.clipboard.writeText(currentSessionId).then(() => toast('Session ID copiado', 'ok'));
+}
+
+async function pasteSessionId() {
+  try {
+    const txt = await navigator.clipboard.readText();
+    document.getElementById('deblurSessionId').value = txt.trim();
+  } catch {
+    toast('Permiso de portapapeles denegado', 'err');
+  }
+}
+
+function clearInput() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('outputBox').className = 'output-box empty';
+  document.getElementById('outputBox').textContent = 'El texto anonimizado aparecerá aquí…';
+  document.getElementById('btnCopyOut').disabled  = true;
+  document.getElementById('btnToDeblur').disabled = true;
+  document.getElementById('mappingSection').style.display = 'none';
+  setStatus('statusMsg', '');
+  anonymisedText = null;
+}
+
+function clearDeblurInput() {
+  document.getElementById('deblurInput').value = '';
+  document.getElementById('deblurOutput').className = 'output-box empty';
+  document.getElementById('deblurOutput').textContent = 'El texto restaurado aparecerá aquí…';
+  document.getElementById('btnCopyDeblur').disabled = true;
+  setStatus('deblurStatus', '');
+}
+
+function setStatus(id, msg, color = 'var(--muted)') {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.color = color;
+}
+
+// ── Manual map entries ─────────────────────────────────────────────────────────
+async function addManualEntry() {
+  const original = document.getElementById('manualOriginal').value.trim();
+  if (!original) { toast('Escribe el valor original', 'err'); return; }
+  const fake = document.getElementById('manualFake').value.trim();
+
+  try {
+    const res = await fetch('/global-map/entries', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        entries:    [{ original, fake: fake || null }],
+        session_id: currentSessionId || null,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+
+    const data = await res.json();
+    const entry = data.added[0];
+    if (!entry) { toast('Entrada ignorada (vacía)', 'err'); return; }
+
+    // Append to table with "manual" tag
+    appendMappingRow(entry.original, entry.fake, true);
+
+    // Update count label
+    const tbody = document.getElementById('mappingTableBody');
+    document.getElementById('mappingCount').textContent = `${tbody.rows.length} entradas`;
+
+    // Open table if collapsed
+    document.getElementById('mappingSection').style.display = '';
+    document.getElementById('mappingBody').classList.add('open');
+    document.getElementById('mappingToggle').classList.add('open');
+
+    document.getElementById('manualOriginal').value = '';
+    document.getElementById('manualFake').value     = '';
+    toast(`Entrada añadida: "${entry.original}" → "${entry.fake}"`, 'ok');
+
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+function appendMappingRow(original, fake, isManual = false) {
+  const tbody = document.getElementById('mappingTableBody');
+  const tr = document.createElement('tr');
+  const manualTag = isManual ? '<span class="tag-manual">manual</span>' : '';
+  tr.innerHTML = `<td class="td-original">${esc(original)}${manualTag}</td><td class="td-fake">${esc(fake)}</td>`;
+  tbody.appendChild(tr);
+}
+
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>

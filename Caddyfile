@@ -1,0 +1,17 @@
+# Blurred – TLS interno (cert auto-generado)
+# Acceso: https://blur.midominio.com o https://localhost:8443
+
+blur.midominio.com {
+    reverse_proxy blur-app:8000
+    tls internal
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+    }
+}
+
+# Acceso por IP/LAN sin DNS
+:80 {
+    reverse_proxy blur-app:8000
+}
